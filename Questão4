@@ -1,0 +1,70 @@
+#QUESTÃO 4
+#MATHEUS BUENO SILVA RIOS 21.1.1078
+
+import pandas as pd
+import numpy as np
+from sklearn.neural_network import MLPRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_absolute_error, r2_score
+
+# Carregar dados com header=None (pois a primeira linha não é cabeçalho)
+df = pd.read_excel('LDR_ball.xlsx', sheet_name='ball_pt', header=None)
+
+# Transpor: linhas viram colunas
+df = df.T
+
+# A primeira linha (após transposição) contém os nomes das variáveis
+df.columns = df.iloc[0]   # Define os nomes das colunas
+df = df.drop(0)           # Remove a linha dos nomes (agora duplicada)
+df.reset_index(drop=True, inplace=True)
+
+# Converter para numérico (caso necessário)
+df = df.apply(pd.to_numeric)
+
+# Verificar as primeiras linhas
+print(df.head())
+
+# Separar entradas (X) e saída (y)
+X = df[['v1(V)', 'v2(V)']].values
+y = df['y(pol)'].values.reshape(-1, 1)
+
+# Normalizar
+scaler_x = StandardScaler()
+scaler_y = StandardScaler()
+X_scaled = scaler_x.fit_transform(X)
+y_scaled = scaler_y.fit_transform(y).ravel()
+
+# Dividir em treino e teste
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y_scaled, test_size=0.15, random_state=42
+)
+
+# Criar e treinar MLP com arquitetura parcimoniosa
+mlp = MLPRegressor(
+    hidden_layer_sizes=(5,),
+    activation='tanh',
+    solver='lbfgs',
+    max_iter=1000,
+    random_state=42,
+    early_stopping=True,
+    validation_fraction=0.15,
+    n_iter_no_change=20
+)
+
+mlp.fit(X_train, y_train)
+
+# Avaliar
+y_pred_scaled = mlp.predict(X_test)
+y_pred = scaler_y.inverse_transform(y_pred_scaled.reshape(-1, 1))
+y_test_orig = scaler_y.inverse_transform(y_test.reshape(-1, 1))
+
+print("MAE:", mean_absolute_error(y_test_orig, y_pred))
+print("R²:", r2_score(y_test_orig, y_pred))
+
+# Exemplo de comparação 
+comparacao = pd.DataFrame({
+    'Real': y_test_orig.flatten(),
+    'Predito': y_pred.flatten()
+})
+print(comparacao.head())
