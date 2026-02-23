@@ -1,0 +1,103 @@
+#Questão 5
+#Matheus Bueno Silva Rios
+
+
+import pandas as pd
+import numpy as np
+import re
+from sklearn.neural_network import MLPClassifier
+from sklearn.preprocessing import StandardScaler
+
+# ==================== DADOS DE TREINAMENTO ====================
+# Carregar apenas a primeira coluna (onde estão todos os dados)
+df_train = pd.read_excel('dadosTrafos.xlsx', sheet_name='tab_treinamento',
+                         header=None, usecols=[0], dtype=str)
+
+# A primeira linha é o cabeçalho ('x1  x2  x3  classe'), pular
+dados_brutos = df_train.iloc[1:, 0].dropna().values
+
+X_list = []
+y_list = []
+for linha in dados_brutos:
+    # Substituir vírgula por ponto (padrão decimal brasileiro)
+    linha = linha.replace(',', '.')
+    # Extrair todos os números (incluindo notação científica)
+    numeros = re.findall(r'-?\d+\.?\d*(?:e[+-]?\d+)?', linha)
+    if len(numeros) >= 4:
+        x1, x2, x3, classe = map(float, numeros[:4])
+        X_list.append([x1, x2, x3])
+        y_list.append(classe)
+    else:
+        print(f"Linha ignorada (valores insuficientes): {linha}")
+
+X_train = np.array(X_list)
+y_train = np.array(y_list)
+
+print("Treinamento - X shape:", X_train.shape)
+print("Treinamento - y shape:", y_train.shape)
+print("Primeiras classes:", y_train[:10])
+print("Classes únicas:", np.unique(y_train))
+
+# Converter y para inteiro
+y_train = y_train.astype(int)
+
+# Padronizar as entradas
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+
+# ==================== TREINAMENTO DAS REDES ====================
+# Rede 1 (seed 42)
+mlp1 = MLPClassifier(hidden_layer_sizes=(4,), activation='tanh',
+                     solver='lbfgs', max_iter=1000, random_state=42,
+                     early_stopping=True, validation_fraction=0.15)
+mlp1.fit(X_train_scaled, y_train)
+
+# Rede 2 (seed 123)
+mlp2 = MLPClassifier(hidden_layer_sizes=(4,), activation='tanh',
+                     solver='lbfgs', max_iter=1000, random_state=123,
+                     early_stopping=True, validation_fraction=0.15)
+mlp2.fit(X_train_scaled, y_train)
+
+# Exibir resultados
+print("\n--- Rede 1 (seed=42) ---")
+print("Épocas:", mlp1.n_iter_)
+print("Pesos camada oculta:\n", mlp1.coefs_[0])
+print("Bias camada oculta:\n", mlp1.intercepts_[0])
+print("Pesos camada saída:\n", mlp1.coefs_[1])
+print("Bias saída:\n", mlp1.intercepts_[1])
+
+print("\n--- Rede 2 (seed=123) ---")
+print("Épocas:", mlp2.n_iter_)
+print("Pesos camada oculta:\n", mlp2.coefs_[0])
+print("Bias camada oculta:\n", mlp2.intercepts_[0])
+print("Pesos camada saída:\n", mlp2.coefs_[1])
+print("Bias saída:\n", mlp2.intercepts_[1])
+
+# ==================== DADOS DE TESTE ====================
+df_test = pd.read_excel('dadosTrafos.xlsx', sheet_name='tab_teste',
+                        header=None, usecols=[0], dtype=str)
+
+# A primeira linha é cabeçalho ('x1  x2  x3'), pular
+dados_test = df_test.iloc[1:, 0].dropna().values
+
+X_test_list = []
+for linha in dados_test:
+    linha = linha.replace(',', '.')
+    numeros = re.findall(r'-?\d+\.?\d*(?:e[+-]?\d+)?', linha)
+    if len(numeros) >= 3:
+        x1, x2, x3 = map(float, numeros[:3])
+        X_test_list.append([x1, x2, x3])
+    else:
+        print(f"Linha de teste ignorada: {linha}")
+
+X_test = np.array(X_test_list)
+X_test_scaled = scaler.transform(X_test)
+
+# Classificar
+y_pred1 = mlp1.predict(X_test_scaled)
+y_pred2 = mlp2.predict(X_test_scaled)
+
+print("\n--- Classificação das novas amostras ---")
+print("Amostra\tx1\t\tx2\t\tx3\t\ty(T1)\ty(T2)")
+for i, (x, p1, p2) in enumerate(zip(X_test, y_pred1, y_pred2)):
+    print(f"{i+1}\t{x[0]:.4f}\t\t{x[1]:.4f}\t\t{x[2]:.4f}\t\t{p1}\t{p2}")
